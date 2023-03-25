@@ -1,2 +1,8 @@
-# AutomaticWateringSystem
-  This is the repo with Arduino project which named Automatic Watering System for home plants
+# Автоматическая система полива комнатных растений
+
+* [Описание проекта](#chapter-0)
+* [Материалы и компоненты](#chapter-1)
+* [Схемы подключения](#chapter-2)
+* [Код проекта](#chapter-3)
+* [Тестирование](#chapter-4)
+* [Инструкция по эксплуатации](#chapter-5)
