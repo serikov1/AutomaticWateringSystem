@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.23)  27 MAR 2023 00:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.3) (preloaded format=pdflatex 2022.4.23)  27 MAR 2023 19:19
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -808,7 +808,48 @@ Underfull \hbox (badness 10000) in paragraph at lines 79--80
 
 [2
 
-] [3] (Automatic Watering System Manual.aux)
+]
+Underfull \hbox (badness 10000) in paragraph at lines 104--105
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 106--107
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 108--109
+
+ []
+
+
+Overfull \hbox (0.12329pt too wide) in paragraph at lines 110--111
+[]$\OMS/cmsy/m/n/12 ^^@$ \T2A/cmr/m/n/12 Ко-ли-че-ство под-дер-жи-ва-е-мых раз-
+лич-ных рас-те-ний - 2 (или боль-ше см. пункт
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 110--111
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 112--113
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 114--115
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 116--117
+
+ []
+
+[3] (Automatic Watering System Manual.aux)
 Package rerunfilecheck Info: File `"Automatic Watering System Manual".out' has 
 not changed.
 (rerunfilecheck)             Checksum: CB51CFF276667B441CCD74E57FDCC984;1229.
@@ -828,10 +869,10 @@ arm1200.pk> <C:\Users\user\AppData\Local\MiKTeX\fonts/pk/ljfour/lh/lh-t2a/dpi60
 0\labx1200.pk> <C:\Users\user\AppData\Local\MiKTeX\fonts/pk/ljfour/lh/lh-t2a/dp
 i600\lacc1200.pk><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr12.
 pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
-Output written on "Automatic Watering System Manual.pdf" (4 pages, 108499 bytes
+Output written on "Automatic Watering System Manual.pdf" (4 pages, 108835 bytes
 ).
 PDF statistics:
- 321 PDF objects out of 1000 (max. 8388607)
+ 322 PDF objects out of 1000 (max. 8388607)
  22 named destinations out of 1000 (max. 500000)
  57 words of extra memory for PDF output out of 10000 (max. 10000000)
 

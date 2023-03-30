@@ -179,7 +179,7 @@ void encoderTick() {
     reDraw();                      // обновить дисплей
   }
 
-  if (encoder.isTurn()) {                                   // если был совершён поворот
+  if (encoder.isTurn()) {                                // если был совершён поворот
     switch (current_set) {                               // смотрим, какая опция сейчас меняется
       case 0:                                            // если номер помпы
         current_pump = encoder.normCount;                // получить значение с энкодера
