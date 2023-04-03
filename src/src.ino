@@ -1,197 +1,263 @@
-#define _LCD_TYPE 1
-#include <LCD_1602_RUS_ALL.h>
-#include <EEPROMex.h>
-#include <EEPROMVar.h>
-#include <EncButton.h>
-#include <Encoder.h>
+#define PUPM_AMOUNT 2       // количество помп, подключенных через реле/мосфет
+#define START_PIN 4         // подключены начиная с пина
+#define SWITCH_LEVEL 1      // уровень для открытого мосфета
+#define PARALLEL 0          // 1 - параллельный полив, 0 - полив в порядке очереди
+#define TIMER_START 1       // 1 - отсчёт периода с момента ВЫКЛЮЧЕНИЯ помпы, 0 - с момента ВКЛЮЧЕНИЯ помпы
+#define BACKL_TOUT 6       // тайм-аут работы экрана
 
-#define PUPM_AMOUNT 2      // количество помп, подключенных через мосфеты
-#define START_PIN 7        // стартовый пин первого мосфета
-#define SWITCH_LEVEL 1     // мосфет - высокий уровень
-#define PARALLEL 0         // 1 - параллельный полив, 0 - полив в порядке очереди
-#define CLK 17             // пин CLOCK энкодера
-#define DT 16              // пин DATA энкодера
-#define SW 15              // пин кнопки энкодера
-
-LCD_1602_RUS lcd(0x27, 16, 2);
-EncButton<EB_TICK, 9> buttonON;
-Encoder encoder(CLK, DT, SW);
-
-static const wchar_t *relayNames[]  = {
-  L"Куст 1",
-  L"Куст 2",
+static const char *relayNames[]  = {
+  "Куст 1",
+  "Куст 2",
 };
 
-unsigned long pump_timers[PUPM_AMOUNT];
-unsigned int pumping_time[PUPM_AMOUNT];
-unsigned int period_time[PUPM_AMOUNT];
-unsigned int time_left[PUPM_AMOUNT];
-boolean pump_state[PUPM_AMOUNT];
+#define CLK 17
+#define DT 16
+#define SW 15
+
+#include "GyverEncoder.h"
+Encoder enc1(CLK, DT, SW);
+
+#include <EEPROMex.h>
+#include <EEPROMVar.h>
+
+#define _LCD_TYPE 1
+#include "LCD_1602_RUS_ALL.h"
+LCD_1602_RUS lcd(0x27, 16, 2);
+
+uint32_t pump_timers[PUPM_AMOUNT];
+uint32_t pumping_time[PUPM_AMOUNT];
+uint32_t period_time[PUPM_AMOUNT];
+bool pump_state[PUPM_AMOUNT];
 byte pump_pins[PUPM_AMOUNT];
 
-byte current_set = 2;
-byte current_pump;
-boolean arrow_update;
-boolean now_pumping;
-unsigned long period_coef, pumping_coef;
+int8_t current_set;
+int8_t current_pump;
+bool now_pumping = false;
+
+int8_t thisH, thisM, thisS;
+long thisPeriod;
+bool startFlag = true;
+uint32_t backlTmr = 0;
+bool backlFlag = true;
 
 void setup() {
-// --------------------- КОНФИГУРИРУЕМ ПИНЫ ---------------------
-  for (byte i = 0; i < PUPM_AMOUNT; i++)              // пробегаем по всем помпам
-  {                                                    
+  // --------------------- КОНФИГУРИРУЕМ ПИНЫ ---------------------
+  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // по всем помпам
     pump_pins[i] = START_PIN + i;                     // настраиваем массив пинов
     pinMode(START_PIN + i, OUTPUT);                   // настраиваем пины
-    digitalWrite(START_PIN + i, !SWITCH_LEVEL);       // выключаем пины
+    digitalWrite(START_PIN + i, !SWITCH_LEVEL);       // выключаем
   }
+  // --------------------- ИНИЦИАЛИЗИРУЕМ ЭКРАН И ЭНКОДЕР ---------------------
 
-// --------------------- НАСТРОЙКА ДИСПЛЕЯ ------------------------
   lcd.init();
   lcd.backlight();
   lcd.clear();
+  enc1.setType(1);
 
-// --------------------- НАЧАЛЬНЫЕ НАСТРОЙКИ ----------------------
-  period_coef = (long)1000 * 60;
-  pumping_coef = 1000;
-
-  // запись в энергонезависимую память
-  if (EEPROM.read(100) != 1) {
-    EEPROM.writeByte(100, 1);
-
-    // для порядку сделаем 1 ячейки с 0 по 99
-    for (byte i = 0; i < 100; i++) {
-      EEPROM.writeByte(i, 1);
-    }
+  // --------------------------- НАСТРОЙКИ EEPROM ---------------------------
+  //в ячейке 1023 должен быть записан флаг, если его нет - делаем (ПЕРВЫЙ ЗАПУСК)
+  if (EEPROM.read(1023) != 5) {
+    EEPROM.writeByte(1023, 5);
+    for (byte i = 0; i < 100; i += 4) EEPROM.writeLong(i, 0);
   }
 
-  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // пробегаем по всем помпам
-    period_time[i] = EEPROM.readByte(2 * i);          // читаем данные из памяти. На чётных - период (ч)
-    pumping_time[i] = EEPROM.readByte(2 * i + 1);     // на нечётных - полив (с)
+  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // по всем помпам
+    period_time[i] = EEPROM.readLong(8 * i);          // читаем данные из памяти. На чётных - период (ПАУЗА)
+    pumping_time[i] = EEPROM.readLong(8 * i + 4);     // на нечётных - полив (РАБОТА)
+    pump_state[i] = 0;                                // выключить все помпы
   }
 
-// -------------------- ВЫВОД НА ДИСПЛЕЙ --------------------------
-  lcd.setCursor(1, 0);
-  lcd.print(relayNames[0]);
-  lcd.setCursor(1, 1);
-  lcd.print("Prd: ");
-  lcd.setCursor(10, 1);
-  lcd.print("t: ");
-
-  arrow_update = true;        // флаг на обновление стрелочки
-
-  reDraw();                   // вывести на дисплей
-  reDraw();                   // вывести на дисплей (флаг стрелок сбросился, выведем числа)
+  // ---------------------- ВЫВОД НА ДИСПЛЕЙ ------------------------
+  drawLabels();
+  changeSet();
 }
 
 void loop() {
-  buttonTick();
   periodTick();
   encoderTick();
   flowTick();
-}
-
-void buttonTick() {
-  buttonON.tick();
-
-  if(buttonON.hasClicks(1) && !arrow_update) {
-    lcd.setBacklight(0);
-  }
-  if(buttonON.hasClicks(2) && !arrow_update) {
-    lcd.backlight();
-  }
-}
-
-void reDraw() {
-  if (arrow_update) {                                     // если изменился режим выбора
-    if (++current_set > 2)                                // менять current_set в пределах 0.. 2
-      current_set = 0;
-    if (current_set == 0) update_EEPROM();                // если переключилиссь на выбор помпы, обновить данные
-    switch (current_set) {                                // смотрим, какая опция сейчас выбрана
-      case 0:                                             // если номер помпы
-        encoder.setCounterNorm(current_pump);             // говорим энкодеру работать с номером помпы
-        encoder.setLimitsNorm(0, PUPM_AMOUNT - 1);        // ограничиваем
-        // стереть предыдущую стрелочку и нарисовать новую
-        lcd.setCursor(0, 0); lcd.write(126); lcd.setCursor(9, 1); lcd.print(" ");
-        break;
-      case 1:
-        encoder.setCounterNorm(period_time[current_pump]);
-        encoder.setLimitsNorm(1, 99);
-        lcd.setCursor(0, 1); lcd.write(126); lcd.setCursor(0, 0); lcd.print(" ");
-        break;
-      case 2:
-        encoder.setCounterNorm(pumping_time[current_pump]);
-        encoder.setLimitsNorm(1, 99);
-        lcd.setCursor(9, 1); lcd.write(126); lcd.setCursor(0, 1); lcd.print(" ");
-        break;
-    }
-    arrow_update = false;
-  } else {
-    // вывести все цифровые значения
-    if (current_set == 0) {
-      lcd.setCursor(1, 0);
-      lcd.print("              ");
-      lcd.setCursor(1, 0);
-      lcd.print(relayNames[current_pump]);
-    }
-    lcd.setCursor(5, 1);
-    lcd.print(period_time[current_pump], DEC);
-    lcd.print("h ");
-    lcd.setCursor(12, 1);
-    lcd.print(pumping_time[current_pump], DEC);
-    lcd.print("s ");
-  }
+  backlTick();
 }
 
 void periodTick() {
-for (byte i = 0; i < PUPM_AMOUNT; i++) {                                        // по всем помпам
-    if ( (millis() - pump_timers[i] > ( (long)period_time[i] * period_coef) )   // проверяем пришло ли вермя включения
-         && (pump_state[i] != SWITCH_LEVEL)                                     // если помпа выключена
-         && !(now_pumping * !PARALLEL)) {                                       // и другая помпа не работает (для непараллельного режима работы) 
-      pump_state[i] = SWITCH_LEVEL;                                             
-      digitalWrite(pump_pins[i], SWITCH_LEVEL);                                 // включаем помпу
+  for (byte i = 0; i < PUPM_AMOUNT; i++) {
+    if ( startFlag ||
+        ( period_time[i] > 0
+         && millis() - pump_timers[i] >= period_time[i] * 1000
+         && (pump_state[i] != SWITCH_LEVEL)
+         && !(now_pumping * !PARALLEL) ) ) {
+      pump_state[i] = SWITCH_LEVEL;
+      digitalWrite(pump_pins[i], SWITCH_LEVEL);
       pump_timers[i] = millis();
       now_pumping = true;
     }
   }
+  startFlag = false;
 }
 
 void flowTick() {
-  for (byte i = 0; i < PUPM_AMOUNT; i++) {                                      // по всем помпам
-    if ( (millis() - pump_timers[i] > ( (long)pumping_time[i] * pumping_coef) ) // проверяем пришло ли время выключения
-         && (pump_state[i] == SWITCH_LEVEL) ) {                                 // если помпа включена
-      pump_state[i] = !SWITCH_LEVEL; 
-      digitalWrite(pump_pins[i], !SWITCH_LEVEL);                                // выключаем помпу                              
+  for (byte i = 0; i < PUPM_AMOUNT; i++) {
+    if ( pumping_time[i] > 0
+        && millis() - pump_timers[i] >= pumping_time[i] * 1000
+        && (pump_state[i] == SWITCH_LEVEL) ) {
+      pump_state[i] = !SWITCH_LEVEL;
+      digitalWrite(pump_pins[i], !SWITCH_LEVEL);
+      if (TIMER_START) pump_timers[i] = millis();
       now_pumping = false;
     }
   }
 }
 
-// обновляем данные в энергонезависимой памяти
-void update_EEPROM() {
-  EEPROM.updateByte(2 * current_pump, period_time[current_pump]);
-  EEPROM.updateByte(2 * current_pump + 1, pumping_time[current_pump]);
+void encoderTick() {
+  enc1.tick();
+
+  if (enc1.isTurn()) {
+    if (backlFlag) {
+      backlTmr = millis();
+      if (enc1.isRight()) {                         // поворот без нажатия на кнопку энкодера
+        if (++current_set >= 7) current_set = 6;
+      } else if (enc1.isLeft()) {
+        if (--current_set < 0) current_set = 0;
+      }
+
+      if (enc1.isRightH())                          // поворот с нажатием на кнопку энкодера
+        changeSettings(1);
+      else if (enc1.isLeftH())
+        changeSettings(-1);
+
+      changeSet();
+    } else {
+      backlOn();
+    }
+  }
 }
 
-void encoderTick() {
-  encoder.tick();                  // отработка энкодера
 
-  if (encoder.isRelease()) {       // если был нажат
-    arrow_update = true;           // флаг на обновление стрелочки
-    reDraw();                      // обновить дисплей
-  }
-
-  if (encoder.isTurn()) {                                // если был совершён поворот
-    switch (current_set) {                               // смотрим, какая опция сейчас меняется
-      case 0:                                            // если номер помпы
-        current_pump = encoder.normCount;                // получить значение с энкодера
-        break;
-      case 1:                                            // если период работы помпы
-        period_time[current_pump] = encoder.normCount;   // получить значение с энкодера
-        break;
-      case 2:                                            // если время работы помпы
-        pumping_time[current_pump] = encoder.normCount;     // получить значение с энкодера
-        break;
+// меняем номер помпы и настройки
+void changeSettings(int increment) {
+  if (current_set == 0) {
+    current_pump += increment;
+    if (current_pump > PUPM_AMOUNT - 1) current_pump = PUPM_AMOUNT - 1;
+    if (current_pump < 0) current_pump = 0;
+    s_to_hms(period_time[current_pump]);
+    drawLabels();
+  } else {
+    if (current_set == 1 || current_set == 4) {
+      thisH += increment;
+    } else if (current_set == 2 || current_set == 5) {
+      thisM += increment;
+    } else if (current_set == 3 || current_set == 6) {
+      thisS += increment;
     }
-    reDraw();                                            // обновить дисплей
+    if (thisS > 59) {
+      thisS = 0;
+      thisM++;
+    }
+    if (thisM > 59) {
+      thisM = 0;
+      thisH++;
+    }
+    if (thisS < 0) {
+      if (thisM > 0) {
+        thisS = 59;
+        thisM--;
+      } else thisS = 0;
+    }
+    if (thisM < 0) {
+      if (thisH > 0) {
+        thisM = 59;
+        thisH--;
+      } else thisM = 0;
+    }
+    if (thisH < 0) thisH = 0;
+    if (current_set < 4) period_time[current_pump] = hms_to_s();
+    else pumping_time[current_pump] = hms_to_s();
   }
+}
+
+// вывести название помп
+void drawLabels() {
+  lcd.setCursor(1, 0);
+  lcd.print("                ");
+  lcd.setCursor(1, 0);
+  lcd.print(relayNames[current_pump]);
+}
+
+// изменение позиции стрелки и вывод данных
+void changeSet() {
+  switch (current_set) {
+    case 0: drawArrow(0, 0); update_EEPROM();
+      break;
+    case 1: drawArrow(7, 1);
+      break;
+    case 2: drawArrow(10, 1);
+      break;
+    case 3: drawArrow(13, 1);
+      break;
+    case 4: drawArrow(7, 1);
+      break;
+    case 5: drawArrow(10, 1);
+      break;
+    case 6: drawArrow(13, 1);
+      break;
+  }
+  lcd.setCursor(0, 1);
+  if (current_set < 4) {
+    lcd.print("Пауза ");
+    s_to_hms(period_time[current_pump]);
+  }
+  else {
+    lcd.print("Работа");
+    s_to_hms(pumping_time[current_pump]);
+  }
+  lcd.setCursor(8, 1);
+  if (thisH < 10) lcd.print(0, DEC);
+  lcd.print(thisH, DEC);
+  lcd.setCursor(11, 1);
+  if (thisM < 10) lcd.print(0, DEC);
+  lcd.print(thisM, DEC);
+  lcd.setCursor(14, 1);
+  if (thisS < 10) lcd.print(0, DEC);
+  lcd.print(thisS, DEC);
+}
+
+// перевод секунд в ЧЧ:ММ:СС
+void s_to_hms(uint32_t period) {
+  thisH = floor((long)period / 3600);                 // секунды в часы (округляем вниз с помощью floor)
+  thisM = floor((period - (long)thisH * 3600) / 60);
+  thisS = period - (long)thisH * 3600 - thisM * 60;
+}
+
+// перевод ЧЧ:ММ:СС в секунды
+uint32_t hms_to_s() {
+  return ((long)thisH * 3600 + thisM * 60 + thisS);
+}
+
+// отрисовка стрелки и двоеточий
+void drawArrow(byte col, byte row) {
+  lcd.setCursor(0, 0); lcd.print(" ");
+  lcd.setCursor(7, 1); lcd.print(" ");
+  lcd.setCursor(10, 1); lcd.print(":");
+  lcd.setCursor(13, 1); lcd.print(":");
+  lcd.setCursor(col, row); lcd.write(126);
+}
+
+// обновляем данные в памяти
+void update_EEPROM() {
+  EEPROM.updateLong(8 * current_pump, period_time[current_pump]);
+  EEPROM.updateLong(8 * current_pump + 4, pumping_time[current_pump]);
+}
+
+void backlTick() {
+  if(backlFlag && millis() - backlTmr >= BACKL_TOUT * 1000) {
+    lcd.setBacklight(0);
+    backlFlag = false;
+  }
+}
+
+void backlOn() {
+  backlFlag = true;
+  backlTmr = millis();
+  lcd.backlight();
 }
 
