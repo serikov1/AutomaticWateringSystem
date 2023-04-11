@@ -3,7 +3,7 @@
 #define SWITCH_LEVEL 1      // уровень для открытого мосфета
 #define PARALLEL 0          // 1 - параллельный полив, 0 - полив в порядке очереди
 #define TIMER_START 1       // 1 - отсчёт периода с момента ВЫКЛЮЧЕНИЯ помпы, 0 - с момента ВКЛЮЧЕНИЯ помпы
-#define BACKL_TOUT 6       // тайм-аут работы экрана
+#define BACKL_TOUT 60       // тайм-аут работы экрана
 
 static const char *relayNames[]  = {
   "Куст 1",
