@@ -1,2 +1,7 @@
 
 presentation/~$perfomance.pptx
+*.aux
+*.idx
+*.log
+*.out
+*.toc
