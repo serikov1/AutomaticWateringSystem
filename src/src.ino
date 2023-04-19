@@ -3,7 +3,7 @@
 #define SWITCH_LEVEL 1      // уровень для открытого мосфета
 #define PARALLEL 0          // 1 - параллельный полив, 0 - полив в порядке очереди
 #define TIMER_START 1       // 1 - отсчёт периода с момента ВЫКЛЮЧЕНИЯ помпы, 0 - с момента ВКЛЮЧЕНИЯ помпы
-#define BACKL_TOUT 60       // тайм-аут работы экрана
+#define BACKL_TOUT 15       // тайм-аут работы экрана
 
 static const char *relayNames[]  = {
   "Куст 1",
@@ -24,11 +24,11 @@ Encoder enc1(CLK, DT, SW);
 #include "LCD_1602_RUS_ALL.h"
 LCD_1602_RUS lcd(0x27, 16, 2);
 
-uint32_t pump_timers[PUPM_AMOUNT];
-uint32_t pumping_time[PUPM_AMOUNT];
-uint32_t period_time[PUPM_AMOUNT];
-bool pump_state[PUPM_AMOUNT];
-byte pump_pins[PUPM_AMOUNT];
+uint32_t pump_timers[PUPM_AMOUNT]{};
+uint32_t pumping_time[PUPM_AMOUNT]{};
+uint32_t period_time[PUPM_AMOUNT]{};
+bool pump_state[PUPM_AMOUNT]{};
+byte pump_pins[PUPM_AMOUNT]{};
 
 int8_t current_set;
 int8_t current_pump;
@@ -36,17 +36,12 @@ bool now_pumping = false;
 
 int8_t thisH, thisM, thisS;
 long thisPeriod;
-bool startFlag = true;
+bool startFlag = false;
 uint32_t backlTmr = 0;
 bool backlFlag = true;
 
 void setup() {
-  // --------------------- КОНФИГУРИРУЕМ ПИНЫ ---------------------
-  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // по всем помпам
-    pump_pins[i] = START_PIN + i;                     // настраиваем массив пинов
-    pinMode(START_PIN + i, OUTPUT);                   // настраиваем пины
-    digitalWrite(START_PIN + i, !SWITCH_LEVEL);       // выключаем
-  }
+  
   // --------------------- ИНИЦИАЛИЗИРУЕМ ЭКРАН И ЭНКОДЕР ---------------------
 
   lcd.init();
@@ -58,13 +53,19 @@ void setup() {
   //в ячейке 1023 должен быть записан флаг, если его нет - делаем (ПЕРВЫЙ ЗАПУСК)
   if (EEPROM.read(1023) != 5) {
     EEPROM.writeByte(1023, 5);
-    for (byte i = 0; i < 100; i += 4) EEPROM.writeLong(i, 0);
+    for (byte i = 0; i < 200; i += 4) EEPROM.writeLong(i, 0);
   }
 
   for (byte i = 0; i < PUPM_AMOUNT; i++) {            // по всем помпам
     period_time[i] = EEPROM.readLong(8 * i);          // читаем данные из памяти. На чётных - период (ПАУЗА)
     pumping_time[i] = EEPROM.readLong(8 * i + 4);     // на нечётных - полив (РАБОТА)
     pump_state[i] = 0;                                // выключить все помпы
+  }
+  // --------------------- КОНФИГУРИРУЕМ ПИНЫ ---------------------
+  for (byte i = 0; i < PUPM_AMOUNT; i++) {            // по всем помпам
+    pump_pins[i] = START_PIN + i;                     // настраиваем массив пинов
+    pinMode(START_PIN + i, OUTPUT);                   // настраиваем пины
+    digitalWrite(START_PIN + i, !SWITCH_LEVEL);       // выключаем
   }
 
   // ---------------------- ВЫВОД НА ДИСПЛЕЙ ------------------------
@@ -82,7 +83,7 @@ void loop() {
 void periodTick() {
   for (byte i = 0; i < PUPM_AMOUNT; i++) {
     if ( startFlag ||
-        ( period_time[i] > 0
+        ( period_time[i] > 0 && pumping_time[i] > 0
          && millis() - pump_timers[i] >= period_time[i] * 1000
          && (pump_state[i] != SWITCH_LEVEL)
          && !(now_pumping * !PARALLEL) ) ) {
@@ -97,7 +98,7 @@ void periodTick() {
 
 void flowTick() {
   for (byte i = 0; i < PUPM_AMOUNT; i++) {
-    if ( pumping_time[i] > 0
+    if ( pumping_time[i] > 0 && period_time[i] > 0
         && millis() - pump_timers[i] >= pumping_time[i] * 1000
         && (pump_state[i] == SWITCH_LEVEL) ) {
       pump_state[i] = !SWITCH_LEVEL;
