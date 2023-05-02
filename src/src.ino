@@ -30,11 +30,11 @@ uint32_t period_time[PUPM_AMOUNT]{};
 bool pump_state[PUPM_AMOUNT]{};
 byte pump_pins[PUPM_AMOUNT]{};
 
-int8_t current_set;
-int8_t current_pump;
+uint8_t current_set;
+uint8_t current_pump;
 bool now_pumping = false;
 
-int8_t thisH, thisM, thisS;
+uint8_t thisH, thisM, thisS;
 long thisPeriod;
 bool startFlag = false;
 uint32_t backlTmr = 0;
@@ -171,6 +171,7 @@ void changeSettings(int increment) {
       } else thisM = 0;
     }
     if (thisH < 0) thisH = 0;
+    if(thisH > 99) thisH = 99;
     if (current_set < 4) period_time[current_pump] = hms_to_s();
     else pumping_time[current_pump] = hms_to_s();
   }
