@@ -40,14 +40,13 @@
 ## Схема подключения модулей
 ![SCHEME](https://github.com/serikov1/AutomaticWateringSystem/blob/main/pictures/scheme.png)
 
-
 <a id="chapter-3"></a>
-### Код проекта смотрите по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/tree/main/src)
-
+### Код проекта смотрите по [ссылке]
+(https://github.com/serikov1/AutomaticWateringSystem/tree/main/src)
 
 <a id="chapter-4"></a>
-### Результаты тестирования и протокол испытыний смотрите по [ссылке]()
-
+### Результаты тестирования и протокол испытыний смотрите по [ссылке]
+(https://github.com/serikov1/AutomaticWateringSystem/tree/main/presentation)
 
 <a id="chapter-5"></a>
 ### Руководство по эксплуатации обязательно(!) к прочтению по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/raw/main/manual/Automatic%20Watering%20System%20Manual.pdf)
