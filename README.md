@@ -44,7 +44,7 @@
 ### Код проекта смотрите по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/tree/main/src)
 
 <a id="chapter-4"></a>
-### Результаты тестирования и протокол испытыний смотрите по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/tree/main/presentation)
+### Результаты тестирования (протоколы испытыний) смотрите по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/tree/main/presentation)
 
 <a id="chapter-5"></a>
 ### Руководство по эксплуатации обязательно(!) к прочтению по [ссылке](https://github.com/serikov1/AutomaticWateringSystem/raw/main/manual/Automatic%20Watering%20System%20Manual.pdf)
